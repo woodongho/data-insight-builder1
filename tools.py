@@ -504,8 +504,25 @@ def top_bottom_n(df, reference_period, n=10, mode="top", label_col=None, value_c
     if missing_count > 0:
         excluded_reasons.append(f"{target_period}년 결측치 {missing_count}개 제외")
 
-    chart_labels = [item["name"] for item in rank_list]
-    chart_values = [item["value"] for item in rank_list]
+    # 차트용 라벨과 데이터 및 색상 구성
+    # 만약 대한민국 정보가 있고 현재 순위 목록(예: 1~10위)에 포함되어 있지 않다면, 비교를 위해 차트 및 목록에 명시적 구분자로 함께 표현
+    chart_labels = []
+    chart_values = []
+    chart_colors = []
+    
+    for item in rank_list:
+        chart_labels.append(f"{item['rank']}위 {item['name']}")
+        chart_values.append(item["value"])
+        if "korea" in item["name"].lower() or "대한민국" in item["name"]:
+            chart_colors.append("#ef4444")  # 대한민국은 강조 색상 (붉은색/포인트)
+        else:
+            chart_colors.append(chart_color)
+
+    # 10위권 밖인 대한민국을 함께 비교하도록 요청된 맥락 지원: 한국이 순위목록에 없으면 비교용으로 차트에 추가
+    if korea_info and not any("korea" in str(it["name"]).lower() for it in rank_list):
+        chart_labels.append(f"🇰🇷 {korea_info['rank']}위 {korea_info['name']}")
+        chart_values.append(korea_info["value"])
+        chart_colors.append("#ef4444")  # 한국 강조 포인트 색상
 
     return {
         "tool": "top_bottom_n",
@@ -530,7 +547,7 @@ def top_bottom_n(df, reference_period, n=10, mode="top", label_col=None, value_c
             "datasets": [{
                 "label": f"{target_period} 이용률 (%)",
                 "data": chart_values,
-                "backgroundColor": chart_color
+                "backgroundColor": chart_colors
             }]
         }
     }

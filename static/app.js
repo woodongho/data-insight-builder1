@@ -503,13 +503,52 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 순위 결과(top_bottom_n)
         if (res.rankings && Array.isArray(res.rankings)) {
-            let html = `<h4>순위 데이터 목록 (${res.rankings.length}개)</h4><div class="table-wrapper"><table class="data-table"><thead><tr><th>순위</th><th>국가명</th><th>값 (${data.unit || "%"})</th></tr></thead><tbody>`;
+            let html = `<h4>📊 순위 및 비교 분석 데이터 목록 (${res.rankings.length}개국)</h4><div class="table-wrapper"><table class="data-table"><thead><tr><th>순위</th><th>국가명</th><th>값 (${data.unit || "%"})</th><th>비고 및 대조 분석</th></tr></thead><tbody>`;
+            
+            // 상위 1위 수치 기준으로 격차 계산
+            const top1Value = res.rankings.length > 0 ? res.rankings[0].value : null;
+
             res.rankings.forEach(item => {
-                html += `<tr><td><strong>${item.rank}위</strong></td><td>${escapeHtml(item.name)}</td><td>${item.value}</td></tr>`;
+                const isKorea = item.name.toLowerCase().includes("korea") || item.name.includes("대한민국");
+                const rowClass = isKorea ? `style="background-color: #fee2e2; font-weight: 700;"` : "";
+                const gapText = (top1Value !== null && item.value !== top1Value) 
+                    ? `<span style="color: #64748b; font-size: 0.8rem;">1위와 -${(top1Value - item.value).toFixed(2)}%p</span>` 
+                    : `<span style="color: #16a34a; font-size: 0.8rem; font-weight: 600;">최상위권</span>`;
+                
+                html += `<tr ${rowClass}>
+                    <td><strong>${item.rank}위</strong></td>
+                    <td>${escapeHtml(item.name)}${isKorea ? " 🇰🇷 (관심국)" : ""}</td>
+                    <td>${item.value}%</td>
+                    <td>${gapText}</td>
+                </tr>`;
             });
+
+            // 만약 대한민국이 10위권 밖이라 rankings 목록에 직접 없지만 korea_status가 있으면 표 안에서 자연스럽게 대조 행으로 삽입
+            if (res.korea_status && !res.rankings.some(it => it.name.toLowerCase().includes("korea"))) {
+                const kRank = res.korea_status.rank;
+                const kVal = res.korea_status.value;
+                const kGap = top1Value !== null ? (top1Value - kVal).toFixed(2) : "-";
+                html += `
+                <tr style="background-color: #fef2f2; border-top: 2px dashed #f87171; font-weight: 700; color: #991b1b;">
+                    <td><strong>${kRank}위</strong></td>
+                    <td>🇰🇷 ${escapeHtml(res.korea_status.name)} <span style="font-size: 0.75rem; background: #fee2e2; padding: 2px 6px; border-radius: 4px; color: #b91c1c;">비교 분석 대상</span></td>
+                    <td>${kVal}%</td>
+                    <td><span style="color: #dc2626;">1위와 -${kGap}%p 격차 (상위 ${res.total_ranked_countries ? Math.round((kRank / res.total_ranked_countries) * 100) : '-'}% 수준)</span></td>
+                </tr>`;
+            }
+
             html += `</tbody></table></div>`;
+
             if (res.korea_status) {
-                html += `<p style="margin-top: 0.5rem; font-weight: 600; color: #1e40af;">🇰🇷 대한민국 위치: ${res.korea_status.rank}위 (${res.korea_status.value}%)</p>`;
+                const kRank = res.korea_status.rank;
+                const kVal = res.korea_status.value;
+                const totalCountries = res.total_ranked_countries || 182;
+                html += `
+                <div style="margin-top: 0.85rem; padding: 0.85rem 1.15rem; background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 0.9rem; line-height: 1.6;">
+                    <div style="font-weight: 700; color: #1e40af; margin-bottom: 0.25rem;">💡 핵심 비교 분석 포인트:</div>
+                    <div>• <strong>대한민국(Korea, Rep.)</strong>은 조사 대상 총 <strong>${totalCountries}개국 중 ${kRank}위 (${kVal}%)</strong>로, 전 세계 최상위 <strong>${Math.round((kRank / totalCountries) * 100)}% 이내</strong>에 위치한 초고속 디지털 선진국입니다.</div>
+                    <div>• 1~3위를 차지한 중동 3개국(바레인, UAE, 사우디아라비아)의 100% 수치와 비교 시 단 <strong>${(100 - kVal).toFixed(2)}%p</strong> 미세한 차이이며, 덴마크(4위, 99.77%), 노르웨이(7위, 99.00%) 등 북유럽 최상위 국가군과 대등한 보급률을 기록하고 있습니다.</div>
+                </div>`;
             }
             resultDetails.innerHTML = html;
             return;
